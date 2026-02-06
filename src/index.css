@@ -1,0 +1,210 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/400.css";
+@import "@fontsource/jetbrains-mono/500.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Deep Dark Mission Control Theme */
+    --background: 222 47% 5%;
+    --foreground: 210 40% 96%;
+
+    --card: 222 47% 7%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 222 47% 7%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 5%;
+
+    --secondary: 217 33% 15%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 96%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.5rem;
+
+    /* Semantic Severity Colors */
+    --critical: 0 84% 60%;
+    --critical-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --safe: 142 71% 45%;
+    --safe-foreground: 0 0% 100%;
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+
+    /* Panel Glassmorphism */
+    --panel: 222 47% 8%;
+    --panel-border: 217 33% 20%;
+    --panel-glow: 217 91% 60%;
+
+    /* Typography */
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    /* Sidebar */
+    --sidebar-background: 222 47% 6%;
+    --sidebar-foreground: 210 40% 80%;
+    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 217 33% 15%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 217 33% 17%;
+    --sidebar-ring: 217 91% 60%;
+  }
+
+  .dark {
+    --background: 222 47% 5%;
+    --foreground: 210 40% 96%;
+    --card: 222 47% 7%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 47% 7%;
+    --popover-foreground: 210 40% 96%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 5%;
+    --secondary: 217 33% 15%;
+    --secondary-foreground: 210 40% 96%;
+    --muted: 217 33% 12%;
+    --muted-foreground: 215 20% 55%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 96%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 217 91% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply dark;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  /* Glassmorphism Panel */
+  .glass-panel {
+    @apply bg-panel/80 backdrop-blur-xl border border-panel-border rounded-lg;
+    box-shadow: 
+      0 0 0 1px hsl(var(--panel-border) / 0.5),
+      0 4px 24px -4px hsl(222 47% 0% / 0.5),
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.02);
+  }
+
+  .glass-panel-glow {
+    @apply glass-panel;
+    box-shadow: 
+      0 0 0 1px hsl(var(--panel-border) / 0.5),
+      0 4px 24px -4px hsl(222 47% 0% / 0.5),
+      0 0 40px -8px hsl(var(--panel-glow) / 0.15),
+      inset 0 1px 0 0 hsl(var(--foreground) / 0.02);
+  }
+
+  /* Severity Badges */
+  .badge-critical {
+    @apply bg-critical/20 text-critical border border-critical/30;
+  }
+
+  .badge-warning {
+    @apply bg-warning/20 text-warning border border-warning/30;
+  }
+
+  .badge-safe {
+    @apply bg-safe/20 text-safe border border-safe/30;
+  }
+
+  .badge-info {
+    @apply bg-info/20 text-info border border-info/30;
+  }
+
+  /* Data Display */
+  .data-mono {
+    font-family: var(--font-mono);
+    @apply text-sm tracking-tight;
+  }
+
+  .data-label {
+    @apply text-xs uppercase tracking-wider text-muted-foreground;
+  }
+
+  /* Live Pulse Animation */
+  .live-pulse {
+    @apply relative;
+  }
+
+  .live-pulse::before {
+    content: '';
+    @apply absolute inset-0 rounded-full bg-critical animate-ping opacity-75;
+  }
+
+  /* Scrollbar Styling */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+@layer utilities {
+  /* Glow Effects */
+  .glow-critical {
+    box-shadow: 0 0 20px -4px hsl(var(--critical) / 0.5);
+  }
+
+  .glow-warning {
+    box-shadow: 0 0 20px -4px hsl(var(--warning) / 0.5);
+  }
+
+  .glow-safe {
+    box-shadow: 0 0 20px -4px hsl(var(--safe) / 0.5);
+  }
+
+  .glow-info {
+    box-shadow: 0 0 20px -4px hsl(var(--info) / 0.5);
+  }
+
+  /* Text Gradient */
+  .text-gradient-brand {
+    @apply bg-gradient-to-r from-info via-primary to-info bg-clip-text text-transparent;
+  }
+}
