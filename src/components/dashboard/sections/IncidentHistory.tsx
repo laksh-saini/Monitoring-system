@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
 // Type definitions
-interface Incident {
+export interface Incident {
   id: string;
   severity: "critical" | "moderate" | "low";
   type: string;
@@ -151,7 +151,11 @@ const statusBadges = {
   "false-alarm": "bg-muted/10 text-muted-foreground border-muted/20",
 };
 
-export const IncidentHistory = () => {
+export const IncidentHistory = ({
+  incoming = [],
+}: {
+  incoming?: Incident[];
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSeverity, setSelectedSeverity] = useState<
     "all" | "critical" | "moderate" | "low"
@@ -159,8 +163,11 @@ export const IncidentHistory = () => {
   const [dateRange, setDateRange] = useState<"24h" | "7d" | "30d">("24h");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Merge incoming detections at the top of the list
+  const merged = [...incoming, ...incidentData];
+
   // Filter incidents
-  const filteredIncidents = incidentData.filter((incident) => {
+  const filteredIncidents = merged.filter((incident) => {
     const matchesSearch =
       incident.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       incident.location.toLowerCase().includes(searchTerm.toLowerCase()) ||

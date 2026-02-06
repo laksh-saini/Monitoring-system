@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Play,
   Pause,
   Maximize2,
   Volume2,
+  VolumeX,
   Car,
   Users,
-  Box,
   Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,12 +14,41 @@ import { cn } from "@/lib/utils";
 const overlayToggles = [
   { icon: Car, label: "Vehicles", active: true },
   { icon: Users, label: "Pedestrians", active: true },
-  { icon: Box, label: "Objects", active: false },
 ];
 
-export function VideoPlayer() {
+export function VideoPlayer({
+  onIncident,
+}: {
+  onIncident?: (incident: any) => void;
+}) {
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
   const [toggles, setToggles] = useState(overlayToggles);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [hasVideo, setHasVideo] = useState(true);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const modelRef = useRef<any>(null);
+  const rafRef = useRef<number | null>(null);
+  const lastAnalysisRef = useRef<number>(0);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const togglesRef = useRef(overlayToggles);
+  const tracksRef = useRef<any[]>([]);
+  const personCounterRef = useRef(0);
+  const vehicleCounterRef = useRef(0);
+
+  const iou = (a: number[], b: number[]) => {
+    const [ax, ay, aw, ah] = a;
+    const [bx, by, bw, bh] = b;
+    const ax2 = ax + aw;
+    const ay2 = ay + ah;
+    const bx2 = bx + bw;
+    const by2 = by + bh;
+    const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(ax, bx));
+    const iy = Math.max(0, Math.min(ay2, by2) - Math.max(ay, by));
+    const inter = ix * iy;
+    const union = aw * ah + bw * bh - inter;
+    return union <= 0 ? 0 : inter / union;
+  };
 
   const handleToggle = (index: number) => {
     setToggles((prev) =>
@@ -27,10 +56,240 @@ export function VideoPlayer() {
     );
   };
 
+  // keep ref in sync so detection loop can read latest toggles without
+  // re-subscribing to effect deps
+  useEffect(() => {
+    togglesRef.current = toggles;
+  }, [toggles]);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (isPlaying) {
+      const p = v.play();
+      if (p && typeof p.then === "function") {
+        p.catch(() => {
+          // autoplay might be blocked; keep UI state in sync
+          setIsPlaying(false);
+        });
+      }
+    } else {
+      v.pause();
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = isMuted;
+  }, [isMuted]);
+
+  const handlePlayPause = () => {
+    if (!videoRef.current) return setIsPlaying((s) => !s);
+    if (isPlaying) {
+      videoRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      const p = videoRef.current.play();
+      if (p && typeof p.then === "function") {
+        p.catch(() => setIsPlaying(false));
+      } else {
+        setIsPlaying(true);
+      }
+    }
+  };
+
+  const handleMuteToggle = () => setIsMuted((m) => !m);
+
+  // Draw detections on overlay canvas
+  const drawDetections = (predictions: any[]) => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const vw = video.videoWidth || video.clientWidth;
+    const vh = video.videoHeight || video.clientHeight;
+    canvas.width = vw;
+    canvas.height = vh;
+    ctx.clearRect(0, 0, vw, vh);
+    ctx.lineWidth = 2;
+    ctx.font = "14px monospace";
+
+    const vehicleClasses = new Set(["car", "truck", "bus", "motorcycle"]);
+
+    predictions.forEach((p) => {
+      const [x, y, w, h] = p.bbox;
+      const cls = p.class;
+      const score = Math.round(p.score * 100);
+      // Respect overlay toggles
+      if (cls === "person" && !toggles[1].active) return;
+      if (vehicleClasses.has(cls) && !toggles[0].active) return;
+      if (!(cls === "person" || vehicleClasses.has(cls))) return;
+
+      // choose color
+      const color = cls === "person" ? "#3b82f6" : "#f97316";
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.stroke();
+
+      const label = `${cls === "person" ? "Person" : "Vehicle"} (${score}%)`;
+      const textWidth = ctx.measureText(label).width + 8;
+      const textHeight = 18;
+      ctx.fillRect(x, Math.max(0, y - textHeight - 4), textWidth, textHeight);
+      ctx.fillStyle = "#000";
+      ctx.fillText(label, x + 4, Math.max(12, y - 6));
+      ctx.fillStyle = color;
+    });
+  };
+
+  // Detection loop using requestAnimationFrame but throttled to ~200ms
+  useEffect(() => {
+    let mounted = true;
+    const loadModelAndStart = async () => {
+      try {
+        // dynamic import so it only runs in browser
+        // @ts-ignore
+        const coco = await import("@tensorflow-models/coco-ssd");
+        // @ts-ignore
+        await import("@tensorflow/tfjs");
+        if (!mounted) return;
+        modelRef.current = await coco.load();
+        if (!mounted) return;
+        setIsDetecting(true);
+        const loop = async () => {
+          const now = performance.now();
+          const video = videoRef.current;
+          const model = modelRef.current;
+          if (!video || !model) {
+            rafRef.current = requestAnimationFrame(loop);
+            return;
+          }
+          // throttle to ~200ms
+          const togglesActive = togglesRef.current[0]?.active || togglesRef.current[1]?.active;
+          if (!togglesActive) {
+            // clear canvas when no toggles are active
+            const c = canvasRef.current;
+            if (c) {
+              const ctx = c.getContext("2d");
+              if (ctx) ctx.clearRect(0, 0, c.width, c.height);
+            }
+            rafRef.current = requestAnimationFrame(loop);
+            return;
+          }
+
+          if (now - lastAnalysisRef.current > 180 && !video.paused && !video.ended) {
+            lastAnalysisRef.current = now;
+            try {
+              const predictions = await model.detect(video as HTMLVideoElement);
+              // Process predictions: filter for person/vehicle classes
+              const vehicleClasses = new Set(["car", "truck", "bus", "motorcycle"]);
+              const relevant = predictions.filter((p: any) => p.class === "person" || vehicleClasses.has(p.class));
+
+              // Simple tracker: match by IoU and same class
+              const nowTs = Date.now();
+              const newTracks: any[] = [];
+
+              relevant.forEach((p: any) => {
+                const bbox = p.bbox;
+                const cls = p.class;
+                let matched = null;
+                let bestIou = 0;
+                tracksRef.current.forEach((t) => {
+                  if (t.cls !== cls) return;
+                  const score = iou(t.bbox, bbox);
+                  if (score > 0.3 && score > bestIou) {
+                    bestIou = score;
+                    matched = t;
+                  }
+                });
+
+                if (matched) {
+                  // update matched track
+                  matched.bbox = bbox;
+                  matched.lastSeen = nowTs;
+                  newTracks.push(matched);
+                } else {
+                  // create new track
+                  const isPerson = cls === "person";
+                  const idLabel = isPerson
+                    ? `Person #${++personCounterRef.current}`
+                    : `Vehicle #${++vehicleCounterRef.current}`;
+                  const track = {
+                    id: idLabel,
+                    cls,
+                    bbox,
+                    score: Math.round(p.score * 100),
+                    createdAt: nowTs,
+                    lastSeen: nowTs,
+                  };
+                  newTracks.push(track);
+
+                  // emit incident for new track
+                  const incident = {
+                    id: `DET-${nowTs}-${track.id}`,
+                    severity: "moderate",
+                    type: isPerson ? "Person Detected" : "Vehicle Detected",
+                    typeIcon: isPerson ? "🚶" : "🚗",
+                    location: "CAM-04",
+                    time: new Date(nowTs).toLocaleString(),
+                    status: "open",
+                    evidence: ["video"],
+                    description: `${track.id} detected (${track.score}%)`,
+                  };
+                  if (onIncident) onIncident(incident);
+                }
+              });
+
+              // keep tracks that were updated recently
+              tracksRef.current = newTracks;
+              drawDetections(relevant);
+            } catch (e) {
+              // ignore detection errors
+            }
+          }
+          rafRef.current = requestAnimationFrame(loop);
+        };
+        rafRef.current = requestAnimationFrame(loop);
+      } catch (e) {
+        // model load failed
+        setIsDetecting(false);
+      }
+    };
+
+    loadModelAndStart();
+
+    return () => {
+      mounted = false;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      modelRef.current = null;
+      setIsDetecting(false);
+    };
+  }, []);
+
   return (
     <div className="relative w-full aspect-video glass-panel overflow-hidden group">
-      {/* Video Background Simulation */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Video Element (load your file to /public/media/incident.mp4) */}
+      <video
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/media/incident.mp4"
+        playsInline
+        onError={() => setHasVideo(false)}
+        onLoadedMetadata={() => setHasVideo(true)}
+        muted={isMuted}
+      />
+
+      {/* Canvas overlay for detections */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+        aria-hidden
+      />
+
+      {/* Video Background Simulation (keeps overlays if video missing) */}
+      {!hasVideo && (
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
         {/* Scan line effect */}
         <div className="absolute inset-0 overflow-hidden opacity-10">
           <div className="absolute w-full h-px bg-gradient-to-r from-transparent via-info to-transparent animate-scan-line" />
@@ -62,7 +321,15 @@ export function VideoPlayer() {
             Person (87%)
           </span>
         </div>
-      </div>
+        </div>
+      )}
+
+      {/* Canvas overlay for detections (on top) */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full pointer-events-none z-50"
+        aria-hidden
+      />
 
       {/* Top Overlay - LIVE Badge & Time */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
@@ -95,8 +362,9 @@ export function VideoPlayer() {
           {/* Playback Controls */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsPlaying(!isPlaying)}
+              onClick={handlePlayPause}
               className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center transition-colors"
+              aria-label={isPlaying ? "Pause video" : "Play video"}
             >
               {isPlaying ? (
                 <Pause className="w-4 h-4 text-white" />
@@ -104,8 +372,16 @@ export function VideoPlayer() {
                 <Play className="w-4 h-4 text-white" />
               )}
             </button>
-            <button className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center transition-colors">
-              <Volume2 className="w-4 h-4 text-white" />
+            <button
+              onClick={handleMuteToggle}
+              className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center transition-colors"
+              aria-label={isMuted ? "Unmute video" : "Mute video"}
+            >
+              {isMuted ? (
+                <VolumeX className="w-4 h-4 text-white" />
+              ) : (
+                <Volume2 className="w-4 h-4 text-white" />
+              )}
             </button>
           </div>
 

@@ -13,6 +13,11 @@ import { MapView } from "@/components/dashboard/sections/MapView";
 const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
+  const [detectedIncidents, setDetectedIncidents] = useState<any[]>([]);
+
+  const handleNewIncident = (incident: any) => {
+    setDetectedIncidents((prev) => [incident, ...prev]);
+  };
 
   return (
     <div className="min-h-screen bg-background flex w-full">
@@ -32,7 +37,7 @@ const Dashboard = () => {
           <div className="flex flex-col p-4 gap-4 min-w-0 overflow-hidden flex-1">
             {/* Top Section - Video Feed */}
             <div className="flex-shrink-0">
-              <VideoPlayer />
+              <VideoPlayer onIncident={handleNewIncident} />
             </div>
 
             {/* Timeline */}
@@ -61,7 +66,9 @@ const Dashboard = () => {
         )}
         
         {/* Incident History - Section 1 */}
-        {activeSection === 1 && <IncidentHistory />}
+        {activeSection === 1 && (
+          <IncidentHistory incoming={detectedIncidents} />
+        )}
         
         {/* Analytics - Section 2 */}
         {activeSection === 2 && <Analytics />}
