@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   AlertTriangle,
   Eye,
@@ -8,8 +9,16 @@ import {
   FileDown,
   CheckCircle2,
   ChevronRight,
+  Phone,
+  RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CallDialog } from "./CallDialog";
+import { useActionTracking } from "@/hooks/useActionTracking";
+import { getContactByType, EmergencyContact } from "@/lib/EmergencyContacts";
+import { generateIncidentReport } from "@/lib/ReportGenerator";
+import { ActionLogger } from "@/lib/ActionLogger";
+import { toast } from "sonner";
 
 interface EvidenceItem {
   icon: typeof Eye;
@@ -24,27 +33,153 @@ const evidenceItems: EvidenceItem[] = [
   { icon: FileText, label: "Text Reports", score: 67, status: "medium" },
 ];
 
-const actionItems = [
-  { icon: Ambulance, label: "Dispatch EMS", priority: "critical" },
-  { icon: Shield, label: "Alert Patrol Unit", priority: "warning" },
-  { icon: FileDown, label: "Generate PDF Report", priority: "info" },
+interface ActionItem {
+  id: string;
+  icon: typeof Ambulance;
+  label: string;
+  priority: "critical" | "warning" | "info";
+  contactType?: "ems" | "police" | "security";
+  action: "call" | "report" | "notify";
+}
+
+const actionItems: ActionItem[] = [
+  {
+    id: "dispatch_ems",
+    icon: Ambulance,
+    label: "Dispatch EMS",
+    priority: "critical",
+    contactType: "ems",
+    action: "call",
+  },
+  {
+    id: "alert_patrol",
+    icon: Shield,
+    label: "Alert Patrol Unit",
+    priority: "warning",
+    contactType: "security",
+    action: "call",
+  },
+  {
+    id: "generate_report",
+    icon: FileDown,
+    label: "Generate PDF Report",
+    priority: "info",
+    action: "report",
+  },
 ];
 
+const INCIDENT_ID = "4029";
+const INCIDENT_DESCRIPTION = "Multi-vehicle collision • Active response";
+const SEVERITY_SCORE = 92;
+const AI_SUMMARY = "The system has detected a high-velocity collision involving two SUVs. Audio analysis confirms breaking glass and distress signals. Emergency response is recommended.";
+
 export function IntelligencePanel() {
+  const [callDialogOpen, setCallDialogOpen] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<EmergencyContact | null>(null);
+  const [currentActionId, setCurrentActionId] = useState<string>("");
+
+  const { isCompleted, completeAction, completionCount, completedActions, resetActions } = useActionTracking(
+    INCIDENT_ID,
+    actionItems.length
+  );
+
+  const handleResetActions = () => {
+    resetActions();
+    toast.info("Actions Reset", {
+      description: "All actions have been cleared. You can start fresh.",
+    });
+  };
+
+  const handleGenerateReport = () => {
+    try {
+      // Get completed action labels
+      const completedActionLabels = actionItems
+        .filter(action => completedActions.has(action.id))
+        .map(action => action.label);
+
+      // Generate the PDF report
+      generateIncidentReport({
+        incidentId: INCIDENT_ID,
+        title: "Multi-Vehicle Collision",
+        description: INCIDENT_DESCRIPTION,
+        timestamp: new Date(),
+        severityScore: SEVERITY_SCORE,
+        aiSummary: AI_SUMMARY,
+        evidenceScores: {
+          visual: evidenceItems[0].score,
+          audio: evidenceItems[1].score,
+          textReports: evidenceItems[2].score,
+        },
+        actionsCompleted: completedActionLabels,
+        location: "Highway 101, Exit 45",
+      });
+
+      // Log the action
+      ActionLogger.log("REPORT_GENERATED", INCIDENT_ID, {
+        description: "PDF incident report generated and downloaded",
+      });
+
+      toast.success("Report Generated", {
+        description: `Incident #${INCIDENT_ID} report downloaded successfully.`,
+      });
+
+      completeAction("generate_report");
+    } catch (error) {
+      console.error("Error generating report:", error);
+      toast.error("Report Generation Failed", {
+        description: "Unable to generate PDF report. Please try again.",
+      });
+    }
+  };
+
+  const handleActionClick = (action: ActionItem) => {
+    console.log("Action clicked:", action);
+    if (action.action === "call" && action.contactType) {
+      const contact = getContactByType(action.contactType);
+      console.log("Contact found:", contact);
+      if (contact) {
+        setSelectedContact(contact);
+        setCurrentActionId(action.id);
+        setCallDialogOpen(true);
+      } else {
+        console.error("Contact not found for type:", action.contactType);
+        toast.error("Contact not found", {
+          description: `Unable to find contact information for ${action.label}`,
+        });
+      }
+    } else if (action.action === "report") {
+      handleGenerateReport();
+    } else if (action.action === "notify") {
+      toast.success("Notification Sent", {
+        description: `${action.label} notification has been sent.`,
+      });
+      completeAction(action.id);
+    }
+  };
+
+  const handleCallCompleted = () => {
+    if (currentActionId) {
+      completeAction(currentActionId);
+      toast.success("Call Initiated", {
+        description: `Emergency call to ${selectedContact?.name} has been initiated.`,
+      });
+    }
+  };
+
   return (
     <aside className="w-80 flex-shrink-0 glass-panel-glow border-l border-panel-border flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-panel-border">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-semibold text-foreground">
-            Incident #4029 Analysis
+            Incident #{INCIDENT_ID} Analysis
           </h2>
           <span className="badge-critical text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
             Critical
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          Multi-vehicle collision • Active response
+          {INCIDENT_DESCRIPTION}
         </p>
       </div>
 
@@ -158,38 +293,78 @@ export function IntelligencePanel() {
           Action Plan
         </span>
         <div className="space-y-2">
-          {actionItems.map((action, index) => (
-            <button
-              key={action.label}
-              className={cn(
-                "w-full flex items-center justify-between p-2.5 rounded-lg transition-all text-sm font-medium",
-                action.priority === "critical" &&
+          {actionItems.map((action) => {
+            const completed = isCompleted(action.id);
+
+            return (
+              <button
+                key={action.id}
+                onClick={() => !completed && handleActionClick(action)}
+                disabled={completed}
+                className={cn(
+                  "w-full flex items-center justify-between p-2.5 rounded-lg transition-all text-sm font-medium",
+                  completed && "opacity-60 cursor-not-allowed",
+                  !completed && action.priority === "critical" &&
                   "bg-critical hover:bg-critical/90 text-critical-foreground glow-critical",
-                action.priority === "warning" &&
+                  !completed && action.priority === "warning" &&
                   "bg-warning/10 hover:bg-warning/20 text-warning border border-warning/30",
-                action.priority === "info" &&
-                  "bg-accent hover:bg-accent/80 text-muted-foreground"
-              )}
-            >
-              <div className="flex items-center gap-2">
-                {index === 0 ? (
-                  <action.icon className="w-4 h-4" />
-                ) : (
-                  <action.icon className="w-4 h-4" />
+                  !completed && action.priority === "info" &&
+                  "bg-accent hover:bg-accent/80 text-muted-foreground",
+                  completed && "bg-safe/10 border border-safe/30"
                 )}
-                {action.label}
-              </div>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          ))}
+              >
+                <div className="flex items-center gap-2">
+                  {completed ? (
+                    <CheckCircle2 className="w-4 h-4 text-safe" />
+                  ) : action.action === "call" ? (
+                    <Phone className="w-4 h-4" />
+                  ) : (
+                    <action.icon className="w-4 h-4" />
+                  )}
+                  <span className={completed ? "text-safe" : ""}>
+                    {action.label}
+                  </span>
+                </div>
+                {completed ? (
+                  <CheckCircle2 className="w-4 h-4 text-safe" />
+                ) : (
+                  <ChevronRight className="w-4 h-4" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Completion Status */}
-        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <CheckCircle2 className="w-4 h-4 text-safe" />
-          <span>2 of 5 actions completed</span>
+        <div className="mt-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <CheckCircle2 className="w-4 h-4 text-safe" />
+            <span>{completionCount} of {actionItems.length} actions completed</span>
+          </div>
+          {completionCount > 0 && (
+            <button
+              onClick={handleResetActions}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="Reset all actions"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Reset
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Call Dialog */}
+      {selectedContact && (
+        <CallDialog
+          open={callDialogOpen}
+          onOpenChange={setCallDialogOpen}
+          contact={selectedContact}
+          incidentId={INCIDENT_ID}
+          incidentDescription={INCIDENT_DESCRIPTION}
+          onCallCompleted={handleCallCompleted}
+        />
+      )}
     </aside>
   );
 }
