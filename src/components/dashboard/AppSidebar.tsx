@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Radio,
   History,
@@ -9,6 +10,8 @@ import {
   ChevronRight,
   Zap,
   Shield,
+  Menu,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { IncidentHistory } from "./sections/IncidentHistory";
@@ -31,16 +34,18 @@ interface AppSidebarProps {
 
 export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps) {
   const [activeItem, setActiveItem] = useState(0);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <aside
       className={cn(
-        "h-screen flex flex-col glass-panel border-r border-panel-border transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        "flex flex-row lg:flex-col glass-panel border-b lg:border-b-0 lg:border-r border-panel-border transition-all duration-300",
+        "h-auto lg:h-screen w-full lg:w-auto",
+        collapsed ? "lg:w-16" : "lg:w-64"
       )}
     >
       {/* Logo */}
-      <div className="p-4 border-b border-panel-border">
+      <div className="p-4 border-b border-panel-border flex items-center justify-between w-full lg:w-auto">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-info to-primary flex items-center justify-center glow-info">
             <Shield className="w-6 h-6 text-foreground" />
@@ -54,10 +59,18 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
             </div>
           )}
         </div>
+
+        {/* Mobile Hamburger */}
+        <button
+          className="lg:hidden p-2 text-muted-foreground hover:text-foreground"
+          onClick={() => setMobileMenuOpen(true)}
+        >
+          <Menu className="w-6 h-6" />
+        </button>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1">
+      {/* Navigation - Desktop */}
+      <nav className="hidden lg:flex flex-1 flex-col p-3 gap-2">
         {navItems.map((item, index) => (
           <button
             key={item.label}
@@ -74,14 +87,69 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
           >
             <item.icon className="w-5 h-5 flex-shrink-0" />
             {!collapsed && (
-              <span className="text-sm font-medium">{item.label}</span>
+              <span className="text-sm font-medium whitespace-nowrap">{item.label}</span>
             )}
           </button>
         ))}
       </nav>
 
+      {/* Mobile Menu Backdrop & Drawer */}
+      {mobileMenuOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] lg:hidden font-sans">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+
+          {/* Drawer Panel */}
+          <div className="absolute inset-y-0 left-0 w-3/4 max-w-sm bg-background border-r border-panel-border p-6 shadow-2xl animate-in slide-in-from-left duration-300">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-info to-primary flex items-center justify-center glow-info">
+                  <Shield className="w-6 h-6 text-foreground" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-foreground tracking-tight">OmniSense</span>
+                  <span className="text-xs text-primary font-medium">AI</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 -mr-2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <nav className="space-y-2">
+              {navItems.map((item, index) => (
+                <button
+                  key={item.label}
+                  onClick={() => {
+                    setActiveItem(index);
+                    onNavigate?.(index);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={cn(
+                    "w-full flex items-center gap-4 px-4 py-3 rounded-lg transition-all text-left",
+                    activeItem === index
+                      ? "bg-primary/10 text-primary border border-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                >
+                  <item.icon className="w-5 h-5" />
+                  <span className="text-base font-medium">{item.label}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* System Status */}
-      <div className="p-3 border-t border-panel-border">
+      <div className={cn("p-3 border-t border-panel-border", mobileMenuOpen ? "hidden" : "hidden lg:block")}>
         <div
           className={cn(
             "flex items-center gap-2 px-3 py-2 rounded-lg bg-safe/5 border border-safe/20",
@@ -108,7 +176,7 @@ export function AppSidebar({ collapsed, onToggle, onNavigate }: AppSidebarProps)
       {/* Collapse Toggle */}
       <button
         onClick={onToggle}
-        className="absolute top-1/2 -right-3 w-6 h-6 bg-panel border border-panel-border rounded-full flex items-center justify-center hover:bg-accent transition-colors"
+        className="hidden lg:flex absolute top-1/2 -right-3 w-6 h-6 bg-panel border border-panel-border rounded-full items-center justify-center hover:bg-accent transition-colors"
       >
         {collapsed ? (
           <ChevronRight className="w-3 h-3 text-muted-foreground" />
