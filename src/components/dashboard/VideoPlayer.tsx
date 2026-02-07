@@ -33,8 +33,17 @@ export function VideoPlayer({
   const [isDetecting, setIsDetecting] = useState(false);
   const togglesRef = useRef(overlayToggles);
   const tracksRef = useRef<any[]>([]);
-  const personCounterRef = useRef(0);
-  const vehicleCounterRef = useRef(0);
+
+  const labelMap: Record<string, string> = {
+    person: "Person",
+    car: "Car",
+    truck: "Truck",
+    bus: "Bus",
+    motorcycle: "Motorcycle",
+    bicycle: "Bike",
+  };
+
+  const capitalize = (s: string) => (s && s[0].toUpperCase() + s.slice(1)) || s;
 
   const iou = (a: number[], b: number[]) => {
     const [ax, ay, aw, ah] = a;
@@ -100,7 +109,7 @@ export function VideoPlayer({
   const handleMuteToggle = () => setIsMuted((m) => !m);
 
   // Draw detections on overlay canvas
-  const drawDetections = (predictions: any[]) => {
+  const drawDetections = (items: any[]) => {
     const canvas = canvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
@@ -113,27 +122,28 @@ export function VideoPlayer({
     ctx.clearRect(0, 0, vw, vh);
     ctx.lineWidth = 2;
     ctx.font = "14px monospace";
+    const vehicleClasses = new Set(["car", "truck", "bus", "motorcycle", "bicycle"]);
 
-    const vehicleClasses = new Set(["car", "truck", "bus", "motorcycle"]);
-
-    predictions.forEach((p) => {
+    items.forEach((p) => {
       const [x, y, w, h] = p.bbox;
-      const cls = p.class;
-      const score = Math.round(p.score * 100);
+      const cls = p.cls || p.class;
+      const score = typeof p.score === "number" && p.score > 1 ? p.score : Math.round((p.score || 0) * 100);
       // Respect overlay toggles
       if (cls === "person" && !toggles[1].active) return;
       if (vehicleClasses.has(cls) && !toggles[0].active) return;
       if (!(cls === "person" || vehicleClasses.has(cls))) return;
 
       // choose color
-      const color = cls === "person" ? "#3b82f6" : "#f97316";
+      let color = cls === "person" ? "#3b82f6" : "#f97316";
+      if (cls === "bicycle") color = "#10b981";
       ctx.strokeStyle = color;
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.rect(x, y, w, h);
       ctx.stroke();
 
-      const label = `${cls === "person" ? "Person" : "Vehicle"} (${score}%)`;
+      const displayName = p.id || labelMap[cls] || capitalize(cls);
+      const label = `${displayName} (${score}%)`;
       const textWidth = ctx.measureText(label).width + 8;
       const textHeight = 18;
       ctx.fillRect(x, Math.max(0, y - textHeight - 4), textWidth, textHeight);
@@ -183,7 +193,7 @@ export function VideoPlayer({
             try {
               const predictions = await model.detect(video as HTMLVideoElement);
               // Process predictions: filter for person/vehicle classes
-              const vehicleClasses = new Set(["car", "truck", "bus", "motorcycle"]);
+              const vehicleClasses = new Set(["car", "truck", "bus", "motorcycle", "bicycle"]);
               const relevant = predictions.filter((p: any) => p.class === "person" || vehicleClasses.has(p.class));
 
               // Simple tracker: match by IoU and same class
@@ -211,12 +221,8 @@ export function VideoPlayer({
                   newTracks.push(matched);
                 } else {
                   // create new track
-                  const isPerson = cls === "person";
-                  const idLabel = isPerson
-                    ? `Person #${++personCounterRef.current}`
-                    : `Vehicle #${++vehicleCounterRef.current}`;
                   const track = {
-                    id: idLabel,
+                    id: labelMap[cls] || capitalize(cls),
                     cls,
                     bbox,
                     score: Math.round(p.score * 100),
@@ -229,8 +235,8 @@ export function VideoPlayer({
                   const incident = {
                     id: `DET-${nowTs}-${track.id}`,
                     severity: "moderate",
-                    type: isPerson ? "Person Detected" : "Vehicle Detected",
-                    typeIcon: isPerson ? "🚶" : "🚗",
+                    type: cls === "person" ? "Person Detected" : `${labelMap[cls] || capitalize(cls)} Detected`,
+                    typeIcon: cls === "person" ? "🚶" : "🚗",
                     location: "CAM-04",
                     time: new Date(nowTs).toLocaleString(),
                     status: "open",
@@ -243,7 +249,7 @@ export function VideoPlayer({
 
               // keep tracks that were updated recently
               tracksRef.current = newTracks;
-              drawDetections(relevant);
+              drawDetections(tracksRef.current);
             } catch (e) {
               // ignore detection errors
             }
