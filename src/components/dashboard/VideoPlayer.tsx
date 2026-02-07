@@ -8,6 +8,7 @@ import {
   Car,
   Users,
   Eye,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +26,8 @@ export function VideoPlayer({
   const [isMuted, setIsMuted] = useState(true);
   const [toggles, setToggles] = useState(overlayToggles);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [hasVideo, setHasVideo] = useState(true);
+  const [hasVideo, setHasVideo] = useState(false);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const modelRef = useRef<any>(null);
   const rafRef = useRef<number | null>(null);
@@ -33,6 +35,9 @@ export function VideoPlayer({
   const [isDetecting, setIsDetecting] = useState(false);
   const togglesRef = useRef(overlayToggles);
   const tracksRef = useRef<any[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const labelMap: Record<string, string> = {
     person: "Person",
@@ -86,10 +91,14 @@ export function VideoPlayer({
     if (isPlaying) {
       const p = v.play();
       if (p && typeof p.then === "function") {
-        p.catch(() => {
-          // autoplay might be blocked; keep UI state in sync
-          setIsPlaying(false);
-        });
+        p
+          .then(() => {
+            setIsPlaying(true);
+          })
+          .catch(() => {
+            // autoplay might be blocked; keep UI state in sync
+            setIsPlaying(false);
+          });
       }
     } else {
       v.pause();
@@ -108,7 +117,7 @@ export function VideoPlayer({
     } else {
       const p = videoRef.current.play();
       if (p && typeof p.then === "function") {
-        p.catch(() => setIsPlaying(false));
+        p.then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
       } else {
         setIsPlaying(true);
       }
@@ -116,6 +125,79 @@ export function VideoPlayer({
   };
 
   const handleMuteToggle = () => setIsMuted((m) => !m);
+
+  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file is a video
+    if (!file.type.startsWith("video/")) {
+      alert("Please upload a valid video file");
+      return;
+    }
+
+    // Create blob URL for the uploaded file
+    const blobUrl = URL.createObjectURL(file);
+    setVideoSrc(blobUrl);
+    setHasVideo(true);
+    setIsPlaying(true);
+
+    // Clean up previous blob URL if exists
+    return () => {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    };
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFullscreen = () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    if (!isFullscreen) {
+      const requestFullscreen = 
+        container.requestFullscreen ||
+        (container as any).webkitRequestFullscreen ||
+        (container as any).mozRequestFullScreen ||
+        (container as any).msRequestFullscreen;
+
+      if (requestFullscreen) {
+        requestFullscreen.call(container).catch(() => {});
+        setIsFullscreen(true);
+      }
+    } else {
+      const exitFullscreen =
+        document.exitFullscreen ||
+        (document as any).webkitExitFullscreen ||
+        (document as any).mozCancelFullScreen ||
+        (document as any).msExitFullscreen;
+
+      if (exitFullscreen) {
+        exitFullscreen.call(document).catch(() => {});
+        setIsFullscreen(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("msfullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("msfullscreenchange", handleFullscreenChange);
+    };
+  }, []);
 
   // Draw detections on overlay canvas
   const drawDetections = (items: any[]) => {
@@ -137,9 +219,10 @@ export function VideoPlayer({
       const [x, y, w, h] = p.bbox;
       const cls = p.cls || p.class;
       const score = typeof p.score === "number" && p.score > 1 ? p.score : Math.round((p.score || 0) * 100);
-      // Respect overlay toggles
-      if (cls === "person" && !toggles[1].active) return;
-      if (vehicleClasses.has(cls) && !toggles[0].active) return;
+      // Respect overlay toggles (read from ref so RAF loop sees latest)
+      const togglesNow = togglesRef.current;
+      if (cls === "person" && !togglesNow[1]?.active) return;
+      if (vehicleClasses.has(cls) && !togglesNow[0]?.active) return;
       if (!(cls === "person" || vehicleClasses.has(cls))) return;
 
       // choose color
@@ -240,10 +323,57 @@ export function VideoPlayer({
                   };
                   newTracks.push(track);
 
-                  // emit incident for new track
+                  // Build AI summary heuristics from current and previous tracks
+                  const prevTracks = tracksRef.current || [];
+                  const vehicleClassesLocal = new Set(["car", "truck", "bus", "motorcycle", "bicycle"]);
+
+                  const center = (b: number[]) => [b[0] + b[2] / 2, b[1] + b[3] / 2];
+                  const dist = (a: number[], b: number[]) => {
+                    const dx = a[0] - b[0];
+                    const dy = a[1] - b[1];
+                    return Math.sqrt(dx * dx + dy * dy);
+                  };
+
+                  let aiSummary = `${labelMap[cls] || capitalize(cls)} detected on CAM-04.`;
+                  // check overlaps with previous tracks to detect collisions
+                  const collisions: string[] = [];
+                  let highVelocity = false;
+
+                  prevTracks.forEach((pt) => {
+                    const iouScore = iou(pt.bbox, track.bbox);
+                    if (iouScore > 0.15) {
+                      const a = labelMap[pt.cls] || capitalize(pt.cls);
+                      const b = labelMap[track.cls] || capitalize(track.cls);
+                      collisions.push(`${a} & ${b}`);
+                    }
+                    // estimate velocity by displacement of previous center -> current center over time
+                    if (pt.cls === track.cls && pt.lastSeen && track.createdAt) {
+                      const prevCenter = center(pt.bbox);
+                      const curCenter = center(track.bbox);
+                      const dt = Math.max(1, track.createdAt - pt.lastSeen) / 1000; // seconds
+                      const pxPerSec = dist(prevCenter, curCenter) / dt;
+                      if (vehicleClassesLocal.has(track.cls) && pxPerSec > 200) {
+                        highVelocity = true;
+                      }
+                    }
+                  });
+
+                  if (collisions.length > 0) {
+                    const uniq = Array.from(new Set(collisions)).join(", ");
+                    aiSummary = `The system detected a potential collision involving ${uniq}.`;
+                    if (highVelocity) aiSummary = aiSummary.replace(".", " at high velocity.");
+                    aiSummary += " Review video evidence; emergency response may be required.";
+                  } else if (vehicleClassesLocal.has(track.cls)) {
+                    aiSummary = `A ${labelMap[track.cls] || capitalize(track.cls)} was detected moving in the scene.`;
+                    if (highVelocity) aiSummary += " Movement indicates high velocity; exercise caution.";
+                  } else if (track.cls === "person") {
+                    aiSummary = "A person was detected in the scene near vehicle activity.";
+                  }
+
+                  // emit incident for new track, include AI summary
                   const incident = {
                     id: `DET-${nowTs}-${track.id}`,
-                    severity: "moderate",
+                    severity: collisions.length > 0 ? (highVelocity ? "high" : "moderate") : "low",
                     type: cls === "person" ? "Person Detected" : `${labelMap[cls] || capitalize(cls)} Detected`,
                     typeIcon: typeIconMap[cls] ?? "🚗",
                     location: "CAM-04",
@@ -251,6 +381,7 @@ export function VideoPlayer({
                     status: "open",
                     evidence: ["video"],
                     description: `${track.id} detected (${track.score}%)`,
+                    aiSummary,
                   };
                   if (onIncident) onIncident(incident);
                 }
@@ -283,28 +414,26 @@ export function VideoPlayer({
   }, []);
 
   return (
-    <div className="relative w-full aspect-video glass-panel overflow-hidden group">
+    <div
+      ref={containerRef}
+      className="relative w-full aspect-video glass-panel overflow-hidden group"
+    >
       {/* Video Element (load your file to /public/media/incident.mp4) */}
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
-        src="/media/incident.mp4"
+        src={videoSrc || "/media/incident.mp4"}
         playsInline
         onError={() => setHasVideo(false)}
         onLoadedMetadata={() => setHasVideo(true)}
         muted={isMuted}
       />
 
-      {/* Canvas overlay for detections */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        aria-hidden
-      />
+      
 
       {/* Video Background Simulation (keeps overlays if video missing) */}
       {!hasVideo && (
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         {/* Scan line effect */}
         <div className="absolute inset-0 overflow-hidden opacity-10">
           <div className="absolute w-full h-px bg-gradient-to-r from-transparent via-info to-transparent animate-scan-line" />
@@ -320,18 +449,33 @@ export function VideoPlayer({
           }}
         />
 
+        {/* Upload prompt */}
+        <div className="relative z-10 text-center space-y-4">
+          <div className="text-6xl mb-4">🎥</div>
+          <h3 className="text-xl font-bold text-foreground">No Video Loaded</h3>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Upload a video file to begin analysis. Supported formats: MP4, WebM, Ogg
+          </p>
+          <button
+            onClick={handleUploadClick}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors font-medium"
+          >
+            Upload Video
+          </button>
+        </div>
+
         {/* Simulated detection boxes */}
-        <div className="absolute top-1/4 left-1/4 w-32 h-20 border-2 border-critical/70 rounded">
+        <div className="absolute top-1/4 left-1/4 w-32 h-20 border-2 border-critical/70 rounded opacity-30">
           <span className="absolute -top-5 left-0 text-[10px] font-mono bg-critical/80 px-1.5 py-0.5 rounded text-critical-foreground">
             SUV #1 (98%)
           </span>
         </div>
-        <div className="absolute top-1/3 right-1/4 w-28 h-18 border-2 border-warning/70 rounded">
+        <div className="absolute top-1/3 right-1/4 w-28 h-18 border-2 border-warning/70 rounded opacity-30">
           <span className="absolute -top-5 left-0 text-[10px] font-mono bg-warning/80 px-1.5 py-0.5 rounded text-warning-foreground">
             SUV #2 (94%)
           </span>
         </div>
-        <div className="absolute bottom-1/4 left-1/3 w-8 h-16 border border-info/50 rounded">
+        <div className="absolute bottom-1/4 left-1/3 w-8 h-16 border border-info/50 rounded opacity-30">
           <span className="absolute -top-5 left-0 text-[10px] font-mono bg-info/80 px-1.5 py-0.5 rounded text-info-foreground whitespace-nowrap">
             Person (87%)
           </span>
@@ -398,6 +542,13 @@ export function VideoPlayer({
                 <Volume2 className="w-4 h-4 text-white" />
               )}
             </button>
+            <button
+              onClick={handleUploadClick}
+              className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center transition-colors"
+              aria-label="Upload video"
+            >
+              <Upload className="w-4 h-4 text-white" />
+            </button>
           </div>
 
           {/* Overlay Toggles */}
@@ -421,11 +572,25 @@ export function VideoPlayer({
           </div>
 
           {/* Fullscreen */}
-          <button className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center transition-colors">
+          <button
+            onClick={handleFullscreen}
+            className="w-9 h-9 rounded-lg bg-white/10 backdrop-blur hover:bg-white/20 flex items-center justify-center transition-colors"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
             <Maximize2 className="w-4 h-4 text-white" />
           </button>
         </div>
       </div>
+
+      {/* Hidden file input for video upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="video/*"
+        onChange={handleVideoUpload}
+        className="hidden"
+        aria-label="Upload video file"
+      />
     </div>
   );
 }

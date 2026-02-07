@@ -37,6 +37,7 @@ export interface Incident {
   status: "open" | "investigating" | "closed" | "false-alarm";
   evidence: ("video" | "audio" | "report")[];
   description?: string;
+  aiSummary?: string;
 }
 
 // Sample data
@@ -342,6 +343,21 @@ export const IncidentHistory = ({
                   <TableRow className="hover:bg-accent/30 border-panel-border">
                     <TableCell colSpan={8} className="bg-accent/20 p-4">
                       <div className="space-y-3">
+                        {incident.aiSummary && (
+                          <div className="bg-panel border border-panel-border p-3 rounded-md">
+                            <div className="flex items-start gap-3">
+                              <div className="text-warning mt-1">
+                                <AlertTriangle className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">AI Summary</p>
+                                <p className="text-sm text-foreground mt-1">
+                                  {incident.aiSummary}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="text-sm">
                           <p className="text-foreground font-semibold mb-2">
                             Incident Details
