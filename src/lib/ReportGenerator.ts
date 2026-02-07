@@ -39,7 +39,7 @@ export class IncidentReportGenerator {
         // Logo/Title
         this.doc.setFontSize(24);
         this.doc.setTextColor(33, 37, 41);
-        this.doc.text("🛡️ OmniSense AI", 20, 20);
+        this.doc.text(" OmniSense AI", 20, 20);
 
         this.doc.setFontSize(10);
         this.doc.setTextColor(108, 117, 125);
@@ -110,7 +110,7 @@ export class IncidentReportGenerator {
 
         // Severity Score Box
         const scoreColor = this.getSeverityColor(data.severityScore);
-        this.doc.setFillColor(scoreColor.r, scoreColor.g, scoreColor.b, 0.1);
+        this.doc.setFillColor(245, 245, 245); // Light gray background for visibility
         this.doc.roundedRect(20, yPos, 170, 25, 3, 3, "F");
 
         // Score

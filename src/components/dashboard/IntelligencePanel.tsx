@@ -69,9 +69,16 @@ const actionItems: ActionItem[] = [
 
 const INCIDENT_ID = "4029";
 const INCIDENT_DESCRIPTION = "Multi-vehicle collision • Active response";
-const SEVERITY_SCORE = 92;
 
-export function IntelligencePanel() {
+interface IntelligencePanelProps {
+  severityScore?: number;
+  severityFactors?: string[];
+}
+
+export function IntelligencePanel({
+  severityScore = 50,
+  severityFactors = []
+}: IntelligencePanelProps) {
   const [callDialogOpen, setCallDialogOpen] = useState(false);
   const [selectedContact, setSelectedContact] = useState<EmergencyContact | null>(null);
   const [currentActionId, setCurrentActionId] = useState<string>("");
@@ -101,7 +108,7 @@ export function IntelligencePanel() {
         title: "Multi-Vehicle Collision",
         description: INCIDENT_DESCRIPTION,
         timestamp: new Date(),
-        severityScore: SEVERITY_SCORE,
+        severityScore: severityScore,
         evidenceScores: {
           visual: evidenceItems[0].score,
           audio: evidenceItems[1].score,
@@ -186,14 +193,14 @@ export function IntelligencePanel() {
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Severity Score
           </span>
-          <span className="text-2xl font-bold text-critical font-mono">92</span>
+          <span className="text-2xl font-bold text-critical font-mono">{severityScore}</span>
         </div>
 
         {/* Radial-ish progress bar */}
         <div className="relative h-3 bg-muted rounded-full overflow-hidden">
           <div
             className="absolute inset-y-0 left-0 bg-gradient-to-r from-safe via-warning to-critical rounded-full transition-all duration-500"
-            style={{ width: "92%" }}
+            style={{ width: `${severityScore}%` }}
           />
           <div className="absolute inset-0 flex items-center justify-between px-1">
             {[0, 25, 50, 75, 100].map((mark) => (
