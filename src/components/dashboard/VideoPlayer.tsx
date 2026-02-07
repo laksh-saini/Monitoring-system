@@ -43,6 +43,15 @@ export function VideoPlayer({
     bicycle: "Bike",
   };
 
+  const typeIconMap: Record<string, string> = {
+    person: "🚶",
+    car: "🚗",
+    truck: "🚚",
+    bus: "🚌",
+    motorcycle: "🏍️",
+    bicycle: "🚲",
+  };
+
   const capitalize = (s: string) => (s && s[0].toUpperCase() + s.slice(1)) || s;
 
   const iou = (a: number[], b: number[]) => {
@@ -236,7 +245,7 @@ export function VideoPlayer({
                     id: `DET-${nowTs}-${track.id}`,
                     severity: "moderate",
                     type: cls === "person" ? "Person Detected" : `${labelMap[cls] || capitalize(cls)} Detected`,
-                    typeIcon: cls === "person" ? "🚶" : "🚗",
+                    typeIcon: typeIconMap[cls] ?? "🚗",
                     location: "CAM-04",
                     time: new Date(nowTs).toLocaleString(),
                     status: "open",

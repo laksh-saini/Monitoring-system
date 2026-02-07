@@ -1,0 +1,15 @@
+{
+  "name": "sarvam-proxy",
+  "version": "1.0.0",
+  "description": "Sarvam AI backend proxy for OmniSense monitoring system",
+  "type": "module",
+  "scripts": {
+    "start": "node sarvam-proxy.js",
+    "dev": "node sarvam-proxy.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "multer": "^1.4.5-lts.1",
+    "form-data": "^4.0.0"
+  }
+}

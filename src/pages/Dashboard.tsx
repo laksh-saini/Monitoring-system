@@ -4,7 +4,6 @@ import { VideoPlayer } from "@/components/dashboard/VideoPlayer";
 import { EventTimeline } from "@/components/dashboard/EventTimeline";
 import { AudioWaveform } from "@/components/dashboard/AudioWaveform";
 import { TranscriptLog } from "@/components/dashboard/TranscriptLog";
-import { IncidentMap } from "@/components/dashboard/IncidentMap";
 import { IntelligencePanel } from "@/components/dashboard/IntelligencePanel";
 import { IncidentHistory } from "@/components/dashboard/sections/IncidentHistory";
 import { Analytics } from "@/components/dashboard/sections/Analytics";
@@ -45,21 +44,13 @@ const Dashboard = () => {
               <EventTimeline />
             </div>
 
-            {/* Bottom Section - Two Columns */}
-            <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
-              {/* Left Column - Audio */}
-              <div className="flex flex-col gap-4 min-h-0">
-                <div className="flex-1 min-h-0">
-                  <AudioWaveform />
-                </div>
-                <div className="flex-1 min-h-0">
-                  <TranscriptLog />
-                </div>
+            {/* Bottom Section - Audio & Transcript */}
+            <div className="flex-1 flex flex-col gap-4 min-h-0">
+              <div className="flex-1 min-h-0">
+                <AudioWaveform />
               </div>
-
-              {/* Right Column - Map */}
-              <div className="min-h-0">
-                <IncidentMap />
+              <div className="flex-1 min-h-0">
+                <TranscriptLog />
               </div>
             </div>
           </div>

@@ -1,6 +1,5 @@
 import { useState } from "react";
 import {
-  AlertTriangle,
   Eye,
   Mic,
   FileText,
@@ -71,7 +70,6 @@ const actionItems: ActionItem[] = [
 const INCIDENT_ID = "4029";
 const INCIDENT_DESCRIPTION = "Multi-vehicle collision • Active response";
 const SEVERITY_SCORE = 92;
-const AI_SUMMARY = "The system has detected a high-velocity collision involving two SUVs. Audio analysis confirms breaking glass and distress signals. Emergency response is recommended.";
 
 export function IntelligencePanel() {
   const [callDialogOpen, setCallDialogOpen] = useState(false);
@@ -104,7 +102,6 @@ export function IntelligencePanel() {
         description: INCIDENT_DESCRIPTION,
         timestamp: new Date(),
         severityScore: SEVERITY_SCORE,
-        aiSummary: AI_SUMMARY,
         evidenceScores: {
           visual: evidenceItems[0].score,
           audio: evidenceItems[1].score,
@@ -212,22 +209,6 @@ export function IntelligencePanel() {
           <span>Moderate</span>
           <span>Critical</span>
         </div>
-      </div>
-
-      {/* AI Summary */}
-      <div className="p-4 border-b border-panel-border">
-        <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle className="w-4 h-4 text-warning" />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            AI Summary
-          </span>
-        </div>
-        <p className="text-xs text-foreground leading-relaxed">
-          The system has detected a{" "}
-          <span className="text-critical font-medium">high-velocity collision</span>{" "}
-          involving two SUVs. Audio analysis confirms breaking glass and distress
-          signals. Emergency response is recommended.
-        </p>
       </div>
 
       {/* Evidence Scores */}

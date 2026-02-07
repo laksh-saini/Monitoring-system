@@ -163,8 +163,8 @@ export const IncidentHistory = ({
   const [dateRange, setDateRange] = useState<"24h" | "7d" | "30d">("24h");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  // Merge incoming detections at the top of the list
-  const merged = [...incoming, ...incidentData];
+  // Merge incoming detections at the top, keep only 12 incidents total
+  const merged = [...incoming, ...incidentData].slice(0, 12);
 
   // Filter incidents
   const filteredIncidents = merged.filter((incident) => {
@@ -178,6 +178,8 @@ export const IncidentHistory = ({
 
     return matchesSearch && matchesSeverity;
   });
+
+  const displayedIncidents = filteredIncidents;
 
   return (
     <div className="h-full flex flex-col gap-4 p-4">
@@ -238,7 +240,7 @@ export const IncidentHistory = ({
       </div>
 
       {/* Table */}
-      <div className="flex-1 overflow-auto glass-panel border border-panel-border rounded-lg">
+      <div className="flex-1 overflow-auto incident-scrollbar glass-panel border border-panel-border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow className="border-panel-border hover:bg-transparent">
@@ -253,7 +255,7 @@ export const IncidentHistory = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredIncidents.map((incident) => (
+            {displayedIncidents.map((incident) => (
               <React.Fragment key={incident.id}>
                 <TableRow
                   onClick={() =>
@@ -366,9 +368,21 @@ export const IncidentHistory = ({
         </Table>
       </div>
 
-      {/* Results counter */}
-      <div className="text-xs text-muted-foreground">
-        Showing {filteredIncidents.length} of {incidentData.length} incidents
+      {/* Results status bar */}
+      <div className="flex items-center justify-between px-4 py-3 rounded-lg glass-panel border border-panel-border bg-panel/50">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className="text-xs font-medium text-muted-foreground">
+            Showing{" "}
+            <span className="font-mono text-foreground">{displayedIncidents.length}</span>
+            {" of "}
+            <span className="font-mono text-foreground">{filteredIncidents.length}</span>
+            {" incidents"}
+          </span>
+        </div>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/80">
+          12 max
+        </span>
       </div>
     </div>
   );
