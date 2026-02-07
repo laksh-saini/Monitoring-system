@@ -26,13 +26,17 @@ export function VideoPlayer({
   onIncident,
   onVideoRef,
   onSeverityUpdate,
+  onTimeUpdate,
+  onDurationChange,
 }: {
   onIncident?: (incident: any) => void;
   onVideoRef?: (el: HTMLVideoElement | null) => void;
   onSeverityUpdate?: (score: number, factors: string[]) => void;
+  onTimeUpdate?: (currentTime: number) => void;
+  onDurationChange?: (duration: number) => void;
 }) {
   const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [toggles, setToggles] = useState(overlayToggles);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [hasVideo, setHasVideo] = useState(false);
@@ -184,7 +188,7 @@ export function VideoPlayer({
         (container as any).msRequestFullscreen;
 
       if (requestFullscreen) {
-        requestFullscreen.call(container).catch(() => {});
+        requestFullscreen.call(container).catch(() => { });
         setIsFullscreen(true);
       }
     } else {
@@ -195,7 +199,7 @@ export function VideoPlayer({
         (document as any).msExitFullscreen;
 
       if (exitFullscreen) {
-        exitFullscreen.call(document).catch(() => {});
+        exitFullscreen.call(document).catch(() => { });
         setIsFullscreen(false);
       }
     }
@@ -404,7 +408,7 @@ export function VideoPlayer({
       ctx.stroke();
 
       const displayName = p.id || labelMap[cls] || capitalize(cls);
-      const label = `${displayName} (${score}%)`;
+      const label = displayName;
       const textWidth = ctx.measureText(label).width + 8;
       const textHeight = 18;
       ctx.fillRect(x, Math.max(0, y - textHeight - 4), textWidth, textHeight);
@@ -592,7 +596,7 @@ export function VideoPlayer({
                     time: new Date(nowTs).toLocaleString(),
                     status: 'open',
                     evidence: ['video'],
-                    description: `${track.id} detected (${track.score}%)`,
+                    description: `${track.id} detected`,
                     aiSummary,
                   };
                   if (onIncident) onIncident(incident);
@@ -668,11 +672,17 @@ export function VideoPlayer({
           videoRef.current = el;
           onVideoRef?.(el);
         }}
+        onTimeUpdate={(e) => onTimeUpdate?.(e.currentTarget.currentTime)}
+        onDurationChange={(e) => onDurationChange?.(e.currentTarget.duration)}
         className='absolute inset-0 w-full h-full object-cover'
         src={videoSrc || '/media/incident.mp4'}
         playsInline
+        autoPlay
         onError={() => setHasVideo(false)}
-        onLoadedMetadata={() => setHasVideo(true)}
+        onLoadedMetadata={(e) => {
+          setHasVideo(true);
+          onDurationChange?.(e.currentTarget.duration);
+        }}
         muted={isMuted}
         crossOrigin='anonymous'
       />
@@ -716,17 +726,17 @@ export function VideoPlayer({
           {/* Simulated detection boxes */}
           <div className='absolute top-1/4 left-1/4 w-32 h-20 border-2 border-critical/70 rounded opacity-30'>
             <span className='absolute -top-5 left-0 text-[10px] font-mono bg-critical/80 px-1.5 py-0.5 rounded text-critical-foreground'>
-              SUV #1 (98%)
+              SUV #1
             </span>
           </div>
           <div className='absolute top-1/3 right-1/4 w-28 h-18 border-2 border-warning/70 rounded opacity-30'>
             <span className='absolute -top-5 left-0 text-[10px] font-mono bg-warning/80 px-1.5 py-0.5 rounded text-warning-foreground'>
-              SUV #2 (94%)
+              SUV #2
             </span>
           </div>
           <div className='absolute bottom-1/4 left-1/3 w-8 h-16 border border-info/50 rounded opacity-30'>
             <span className='absolute -top-5 left-0 text-[10px] font-mono bg-info/80 px-1.5 py-0.5 rounded text-info-foreground whitespace-nowrap'>
-              Person (87%)
+              Person
             </span>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { AppSidebar } from '@/components/dashboard/AppSidebar';
 import { VideoPlayer } from '@/components/dashboard/VideoPlayer';
 import { EventTimeline } from '@/components/dashboard/EventTimeline';
@@ -16,6 +16,13 @@ const Dashboard = () => {
   const [detectedIncidents, setDetectedIncidents] = useState<any[]>([]);
   const [severityScore, setSeverityScore] = useState(50);
   const [severityFactors, setSeverityFactors] = useState<string[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [crashEvents, setCrashEvents] = useState<
+    { time: string; position: number; type: 'critical'; label: string }[]
+  >([]);
+  const lastCrashTimeRef = useRef(0);
+  const [videoElementState, setVideoElementState] = useState<HTMLVideoElement | null>(null);
 
   const {
     entries,
@@ -33,13 +40,51 @@ const Dashboard = () => {
     setDetectedIncidents((prev) => [incident, ...prev]);
   };
 
+  const handleSeek = (time: number) => {
+    setCurrentTime(time);
+    const videoElement = document.querySelector('video');
+    if (videoElement) {
+      videoElement.currentTime = time;
+    }
+  };
+
   const handleSeverityUpdate = (score: number, factors: string[]) => {
     setSeverityScore(score);
     setSeverityFactors(factors);
+
+    // Detect crash events (severity > 75) after 5 seconds
+    if (score > 75 && currentTime > 5) {
+      const now = Date.now();
+      // Throttle crash events to avoid duplicates (e.g., 5 seconds cooldown)
+      if (now - lastCrashTimeRef.current > 5000) {
+        lastCrashTimeRef.current = now;
+        const minutes = Math.floor(currentTime / 60);
+        const seconds = Math.floor(currentTime % 60);
+        const milliseconds = Math.floor((currentTime % 1) * 100);
+        const timeString = `${minutes}:${String(seconds).padStart(2, '0')}:${String(milliseconds).padStart(2, '0')}`;
+
+        setCrashEvents((prev) => [
+          ...prev,
+          {
+            time: timeString,
+            position: currentTime,
+            type: 'critical',
+            label: 'Crash Detected',
+          },
+        ]);
+      }
+    }
   };
 
+  // DEMO: Simulate crash at 5.2 seconds to ensure UI feedback
+  useEffect(() => {
+    if (currentTime > 5.2 && currentTime < 5.8 && severityScore <= 75) {
+      handleSeverityUpdate(88, ['Vehicle Collision Detected', 'High Velocity']);
+    }
+  }, [currentTime, severityScore]);
+
   return (
-    <div className='min-h-screen bg-background flex w-full'>
+    <div className='min-h-screen bg-background flex flex-col lg:flex-row w-full overflow-x-hidden'>
       {/* Left Sidebar */}
       <div className='relative flex-shrink-0'>
         <AppSidebar
@@ -50,7 +95,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <main className='flex-1 flex flex-col min-w-0 overflow-hidden'>
+      <main className='flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden h-auto lg:h-screen'>
         {/* Live Monitoring - Section 0 */}
         {activeSection === 0 && (
           <div className='flex flex-col p-4 gap-4 min-w-0 overflow-hidden flex-1'>
@@ -58,21 +103,31 @@ const Dashboard = () => {
             <div className='flex-shrink-0'>
               <VideoPlayer
                 onIncident={handleNewIncident}
-                onVideoRef={setVideoElement}
+                onVideoRef={(el) => {
+                  setVideoElement(el);
+                  setVideoElementState(el);
+                }}
                 onSeverityUpdate={handleSeverityUpdate}
+                onTimeUpdate={setCurrentTime}
+                onDurationChange={setDuration}
               />
             </div>
 
             {/* Timeline */}
             <div className='flex-shrink-0'>
-              <EventTimeline />
+              <EventTimeline
+                currentTime={currentTime}
+                duration={duration}
+                events={crashEvents}
+                onSeek={handleSeek}
+              />
             </div>
 
             {/* Bottom Section - Audio & Transcript */}
             <div className='flex-1 flex flex-col gap-4 min-h-0'>
               <div className='flex-1 min-h-0'>
-                <AudioWaveform />
-              </div>
+                <AudioWaveform videoElement={videoElementState} />
+              </div> (
               <div className='flex-1 min-h-0'>
                 <TranscriptLog
                   entries={entries}

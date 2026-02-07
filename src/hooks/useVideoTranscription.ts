@@ -69,6 +69,8 @@ export function useVideoTranscription() {
     videoElRef.current = el;
   }, []);
 
+
+
   /** Start capturing audio from the video and transcribing via Sarvam AI */
   const startTranscription = useCallback(() => {
     const video = videoElRef.current;
@@ -208,6 +210,18 @@ export function useVideoTranscription() {
       RECORD_DURATION + RECORD_GAP,
     );
   }, [addEntry]);
+
+  // Auto-start transcription when video element is available
+  useEffect(() => {
+    const checkAndStart = () => {
+      if (videoElRef.current && !isTranscribingRef.current && !error) {
+        startTranscription();
+      }
+    };
+
+    const timer = setTimeout(checkAndStart, 2000);
+    return () => clearTimeout(timer);
+  }, [videoElRef.current, startTranscription, error]);
 
   /** Stop transcription */
   const stopTranscription = useCallback(() => {

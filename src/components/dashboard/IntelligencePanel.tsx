@@ -171,7 +171,7 @@ export function IntelligencePanel({
   };
 
   return (
-    <aside className="w-80 flex-shrink-0 glass-panel-glow border-l border-panel-border flex flex-col h-full overflow-hidden">
+    <aside className="w-full lg:w-80 flex-shrink-0 glass-panel-glow border-t lg:border-t-0 lg:border-l border-panel-border flex flex-col h-auto lg:h-full overflow-hidden">
       {/* Header */}
       <div className="p-4 border-b border-panel-border">
         <div className="flex items-center justify-between mb-2">
@@ -218,62 +218,7 @@ export function IntelligencePanel({
         </div>
       </div>
 
-      {/* Evidence Scores */}
-      <div className="p-4 border-b border-panel-border flex-1 overflow-y-auto">
-        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider block mb-3">
-          Evidence Confidence
-        </span>
-        <div className="space-y-3">
-          {evidenceItems.map((item) => (
-            <div
-              key={item.label}
-              className="flex items-center gap-3 p-2 rounded-lg bg-accent/30"
-            >
-              <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-                <item.icon className="w-4 h-4 text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-foreground">
-                    {item.label}
-                  </span>
-                  <span
-                    className={cn(
-                      "text-xs font-bold font-mono",
-                      item.status === "high" && "text-safe",
-                      item.status === "medium" && "text-warning",
-                      item.status === "low" && "text-critical"
-                    )}
-                  >
-                    {item.score}%
-                  </span>
-                </div>
-                <div className="h-1.5 bg-muted rounded-full mt-1 overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all",
-                      item.status === "high" && "bg-safe",
-                      item.status === "medium" && "bg-warning",
-                      item.status === "low" && "bg-critical"
-                    )}
-                    style={{ width: `${item.score}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
 
-        {/* New Evidence Alert */}
-        <div className="mt-3 p-2 rounded-lg border border-info/30 bg-info/5">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-info" />
-            <span className="text-xs text-info font-medium">
-              3 New Social Media Reports
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* Action Plan */}
       <div className="p-4 border-t border-panel-border">
@@ -343,16 +288,18 @@ export function IntelligencePanel({
       </div>
 
       {/* Call Dialog */}
-      {selectedContact && (
-        <CallDialog
-          open={callDialogOpen}
-          onOpenChange={setCallDialogOpen}
-          contact={selectedContact}
-          incidentId={INCIDENT_ID}
-          incidentDescription={INCIDENT_DESCRIPTION}
-          onCallCompleted={handleCallCompleted}
-        />
-      )}
-    </aside>
+      {
+        selectedContact && (
+          <CallDialog
+            open={callDialogOpen}
+            onOpenChange={setCallDialogOpen}
+            contact={selectedContact}
+            incidentId={INCIDENT_ID}
+            incidentDescription={INCIDENT_DESCRIPTION}
+            onCallCompleted={handleCallCompleted}
+          />
+        )
+      }
+    </aside >
   );
 }
