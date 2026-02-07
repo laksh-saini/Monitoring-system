@@ -95,10 +95,10 @@ const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <main className='flex-1 flex flex-col min-w-0 overflow-y-auto lg:overflow-hidden h-auto lg:h-screen'>
+      <main className='flex-1 flex flex-col min-w-0 overflow-y-auto h-auto'>
         {/* Live Monitoring - Section 0 */}
         {activeSection === 0 && (
-          <div className='flex flex-col p-4 gap-4 min-w-0 overflow-hidden flex-1'>
+          <div className='flex flex-col p-4 gap-4 min-w-0 flex-1'>
             {/* Top Section - Video Feed */}
             <div className='flex-shrink-0'>
               <VideoPlayer

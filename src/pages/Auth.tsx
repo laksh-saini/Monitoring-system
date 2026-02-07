@@ -19,9 +19,9 @@ const Auth = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden bg-background flex items-center justify-center">
+    <div className="relative min-h-screen w-full overflow-y-auto bg-background flex">
       {/* Animated Mesh Gradient Background */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
         {/* Base topology grid */}
         <div className="absolute inset-0 opacity-20">
           <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
@@ -53,10 +53,10 @@ const Auth = () => {
       </div>
 
       {/* Login Card */}
-      <div className="relative z-10 w-full max-w-md mx-4">
+      <div className="relative z-10 w-full max-w-md m-auto px-4 py-12">
         {/* Outer glow effect */}
         <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 via-info/20 to-primary/20 rounded-2xl blur opacity-50" />
-        
+
         {/* Card */}
         <div className="relative glass-panel-glow rounded-2xl p-8 space-y-8">
           {/* Logo Section */}
@@ -140,7 +140,7 @@ const Auth = () => {
                   <div className="absolute inset-0 bg-gradient-to-r from-primary via-info to-primary opacity-0 group-hover:opacity-20 transition-opacity" />
                 </>
               )}
-              
+
               {/* Button glow */}
               <div className="absolute -inset-1 bg-gradient-to-r from-primary to-info rounded-lg blur opacity-30 group-hover:opacity-50 transition-opacity -z-10" />
             </Button>
@@ -161,7 +161,7 @@ const Auth = () => {
                     <div className="absolute w-full h-1 bg-gradient-to-b from-transparent via-primary to-transparent animate-scan-line" />
                   </div>
                 </div>
-                
+
                 <div className="text-center space-y-2">
                   <p className="text-foreground font-semibold">Verifying Biometrics</p>
                   <p className="text-muted-foreground text-sm font-mono">
