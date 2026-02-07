@@ -13,9 +13,16 @@ const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
   const [detectedIncidents, setDetectedIncidents] = useState<any[]>([]);
+  const [severityScore, setSeverityScore] = useState(50);
+  const [severityFactors, setSeverityFactors] = useState<string[]>([]);
 
   const handleNewIncident = (incident: any) => {
     setDetectedIncidents((prev) => [incident, ...prev]);
+  };
+
+  const handleSeverityUpdate = (score: number, factors: string[]) => {
+    setSeverityScore(score);
+    setSeverityFactors(factors);
   };
 
   return (
@@ -36,7 +43,10 @@ const Dashboard = () => {
           <div className="flex flex-col p-4 gap-4 min-w-0 overflow-hidden flex-1">
             {/* Top Section - Video Feed */}
             <div className="flex-shrink-0">
-              <VideoPlayer onIncident={handleNewIncident} />
+              <VideoPlayer
+                onIncident={handleNewIncident}
+                onSeverityUpdate={handleSeverityUpdate}
+              />
             </div>
 
             {/* Timeline */}
@@ -55,18 +65,18 @@ const Dashboard = () => {
             </div>
           </div>
         )}
-        
+
         {/* Incident History - Section 1 */}
         {activeSection === 1 && (
           <IncidentHistory incoming={detectedIncidents} />
         )}
-        
+
         {/* Analytics - Section 2 */}
         {activeSection === 2 && <Analytics />}
-        
+
         {/* Map View - Section 3 */}
         {activeSection === 3 && <MapView />}
-        
+
         {/* Settings - Section 4 */}
         {activeSection === 4 && (
           <div className="flex items-center justify-center h-full text-muted-foreground">
@@ -79,9 +89,10 @@ const Dashboard = () => {
       </main>
 
       {/* Right Intelligence Panel */}
-      <IntelligencePanel />
+      <IntelligencePanel severityScore={severityScore} severityFactors={severityFactors} />
     </div>
   );
 };
 
 export default Dashboard;
+
