@@ -14,6 +14,8 @@ const Dashboard = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeSection, setActiveSection] = useState(0);
   const [detectedIncidents, setDetectedIncidents] = useState<any[]>([]);
+  const [severityScore, setSeverityScore] = useState(50);
+  const [severityFactors, setSeverityFactors] = useState<string[]>([]);
 
   const {
     entries,
@@ -29,6 +31,11 @@ const Dashboard = () => {
 
   const handleNewIncident = (incident: any) => {
     setDetectedIncidents((prev) => [incident, ...prev]);
+  };
+
+  const handleSeverityUpdate = (score: number, factors: string[]) => {
+    setSeverityScore(score);
+    setSeverityFactors(factors);
   };
 
   return (
@@ -52,6 +59,7 @@ const Dashboard = () => {
               <VideoPlayer
                 onIncident={handleNewIncident}
                 onVideoRef={setVideoElement}
+                onSeverityUpdate={handleSeverityUpdate}
               />
             </div>
 
@@ -104,7 +112,10 @@ const Dashboard = () => {
       </main>
 
       {/* Right Intelligence Panel */}
-      <IntelligencePanel />
+      <IntelligencePanel
+        severityScore={severityScore}
+        severityFactors={severityFactors}
+      />
     </div>
   );
 };
