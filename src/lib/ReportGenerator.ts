@@ -7,7 +7,6 @@ export interface IncidentData {
     description: string;
     timestamp: Date;
     severityScore: number;
-    aiSummary: string;
     evidenceScores: {
         visual: number;
         audio: number;
@@ -136,19 +135,6 @@ export class IncidentReportGenerator {
         this.doc.setFillColor(scoreColor.r, scoreColor.g, scoreColor.b);
         this.doc.roundedRect(barX, barY, progressWidth, barHeight, 3, 3, "F");
 
-        yPos += 35;
-
-        // AI Summary
-        this.doc.setFontSize(11);
-        this.doc.setTextColor(73, 80, 87);
-        this.doc.setFont("helvetica", "bold");
-        this.doc.text("AI Analysis Summary:", 20, yPos);
-
-        yPos += 6;
-        this.doc.setFontSize(10);
-        this.doc.setFont("helvetica", "normal");
-        const summaryLines = this.doc.splitTextToSize(data.aiSummary, 170);
-        this.doc.text(summaryLines, 20, yPos);
     }
 
     private addEvidenceScores(data: IncidentData): void {

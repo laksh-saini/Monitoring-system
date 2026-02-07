@@ -183,6 +183,35 @@
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/40;
   }
+
+  /* Incident History scrollbar - mission control styled */
+  .incident-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #3676dd transparent;
+  }
+
+  .incident-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .incident-scrollbar::-webkit-scrollbar-track {
+    @apply bg-panel/50 rounded-full;
+    margin: 4px;
+  }
+
+  .incident-scrollbar::-webkit-scrollbar-thumb {
+    @apply rounded-full;
+    background: #3676dd;
+  }
+
+  .incident-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #4a8af0;
+  }
+
+  .incident-scrollbar::-webkit-scrollbar-corner {
+    @apply bg-transparent;
+  }
 }
 
 @layer utilities {
