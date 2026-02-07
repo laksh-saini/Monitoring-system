@@ -2,30 +2,42 @@
  * Sarvam AI Service
  *
  * Client for Sarvam AI APIs - Indian language AI (Speech-to-Text, Text-to-Speech,
- * Translation, Chat Completion). Calls go through a backend proxy to keep API keys secure.
+ * Translation, Chat Completion). Calls the Sarvam API directly using your API key
+ * set via the VITE_SARVAM_API_KEY environment variable.
  *
- * Setup: Configure VITE_SARVAM_API_URL to point to your backend proxy (e.g. /api/sarvam)
+ * Setup: Add VITE_SARVAM_API_KEY=your_key to a .env file in the project root.
  */
 
-const getBaseUrl = () =>
-  import.meta.env.VITE_SARVAM_API_URL ?? "/api/sarvam";
+const SARVAM_BASE = 'https://api.sarvam.ai';
+
+function getApiKey(): string {
+  const key = import.meta.env.VITE_SARVAM_API_KEY;
+  if (!key)
+    throw new Error(
+      'VITE_SARVAM_API_KEY is not set. Add it to your .env file.',
+    );
+  return key;
+}
 
 async function sarvamFetch<T>(
   path: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<T> {
-  const url = `${getBaseUrl()}${path}`;
+  const url = `${SARVAM_BASE}${path}`;
   const res = await fetch(url, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
+      'api-subscription-key': getApiKey(),
       ...options.headers,
     },
   });
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message || "Sarvam AI request failed");
+    throw new Error(
+      (err as { message?: string }).message || 'Sarvam AI request failed',
+    );
   }
 
   return res.json();
@@ -34,22 +46,39 @@ async function sarvamFetch<T>(
 /** Transcribe audio to text (Speech-to-Text) - Indian languages + English */
 export async function transcribeAudio(
   audioBlob: Blob,
-  options?: { languageCode?: string; model?: string }
-): Promise<{ transcript: string; language_code?: string }> {
+  options?: { languageCode?: string; model?: string; fileName?: string },
+): Promise<{
+  transcript: string;
+  language_code?: string;
+  confidence?: number;
+}> {
   const formData = new FormData();
-  formData.append("file", audioBlob, "audio.wav");
-  if (options?.languageCode) formData.append("language_code", options.languageCode);
-  if (options?.model) formData.append("model", options.model ?? "saarika:v2.5");
+  formData.append('file', audioBlob, options?.fileName ?? 'audio.wav');
+  // language_code is optional — omit it to let the API auto-detect
+  if (options?.languageCode && options.languageCode !== 'unknown') {
+    formData.append('language_code', options.languageCode);
+  }
+  formData.append('model', options?.model ?? 'saarika:v2.5');
 
-  const url = `${getBaseUrl()}/speech-to-text`;
-  const res = await fetch(url, {
-    method: "POST",
+  const res = await fetch(`${SARVAM_BASE}/speech-to-text`, {
+    method: 'POST',
+    headers: {
+      'api-subscription-key': getApiKey(),
+    },
     body: formData,
   });
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error((err as { message?: string }).message || "Transcription failed");
+    const body = await res.text().catch(() => '');
+    let msg = `Sarvam STT ${res.status}`;
+    try {
+      const parsed = JSON.parse(body);
+      msg = parsed?.error?.message || parsed?.message || parsed?.detail || msg;
+    } catch {
+      /* use default */
+    }
+    console.error('[Sarvam STT] API error:', res.status, body);
+    throw new Error(msg);
   }
 
   return res.json();
@@ -59,13 +88,13 @@ export async function transcribeAudio(
 export async function translateText(
   input: string,
   targetLanguage: string,
-  options?: { sourceLanguage?: string }
+  options?: { sourceLanguage?: string },
 ): Promise<{ translated_text: string }> {
-  return sarvamFetch("/translate", {
-    method: "POST",
+  return sarvamFetch('/translate', {
+    method: 'POST',
     body: JSON.stringify({
       input,
-      source_language_code: options?.sourceLanguage ?? "auto",
+      source_language_code: options?.sourceLanguage ?? 'auto',
       target_language_code: targetLanguage,
     }),
   });
@@ -73,42 +102,45 @@ export async function translateText(
 
 /** Generate text via Chat Completion (e.g. incident summaries) */
 export async function chatCompletion(
-  messages: Array<{ role: "user" | "assistant" | "system"; content: string }>,
-  options?: { model?: string }
+  messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>,
+  options?: { model?: string },
 ): Promise<{ content: string }> {
   const res = await sarvamFetch<{
     choices?: Array<{ message?: { content?: string } }>;
     translated_text?: string;
-  }>("/chat", {
-    method: "POST",
+  }>('/chat/completions', {
+    method: 'POST',
     body: JSON.stringify({
       messages,
-      model: options?.model ?? "OpenHathi-7B-Instruct",
+      model: options?.model ?? 'OpenHathi-7B-Instruct',
     }),
   });
 
   const content =
     res.choices?.[0]?.message?.content ??
     (res as { content?: string }).content ??
-    "";
+    '';
   return { content };
 }
 
 /** Text-to-Speech - returns audio blob URL */
 export async function textToSpeech(
   text: string,
-  options?: { languageCode?: string; speakerGender?: "Male" | "Female" }
+  options?: { languageCode?: string; speakerGender?: 'Male' | 'Female' },
 ): Promise<Blob> {
-  const res = await fetch(`${getBaseUrl()}/text-to-speech`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
+  const res = await fetch(`${SARVAM_BASE}/text-to-speech`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-subscription-key': getApiKey(),
+    },
     body: JSON.stringify({
       text,
-      language_code: options?.languageCode ?? "hi-IN",
-      speaker_gender: options?.speakerGender ?? "Female",
+      language_code: options?.languageCode ?? 'hi-IN',
+      speaker_gender: options?.speakerGender ?? 'Female',
     }),
   });
 
-  if (!res.ok) throw new Error("TTS failed");
+  if (!res.ok) throw new Error('TTS failed');
   return res.blob();
 }
