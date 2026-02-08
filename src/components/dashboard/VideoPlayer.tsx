@@ -60,6 +60,19 @@ export function VideoPlayer({
   const preAnalysisVideoRef = useRef<HTMLVideoElement | null>(null);
   const [preBufferProgress, setPreBufferProgress] = useState(0);
   const [isPreBuffering, setIsPreBuffering] = useState(false);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDate(new Date());
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatCurrentTime = (date: Date) => {
+    const pad = (n: number, w = 2) => n.toString().padStart(w, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+  };
 
   const labelMap: Record<string, string> = {
     person: 'Person',
@@ -771,7 +784,7 @@ export function VideoPlayer({
         {/* Timestamp */}
         <div className='bg-black/50 backdrop-blur px-3 py-1 rounded-md'>
           <span className='text-xs font-mono text-foreground'>
-            2024-01-15 14:32:45.892
+            {formatCurrentTime(currentDate)}
           </span>
         </div>
       </div>

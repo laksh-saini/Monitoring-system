@@ -111,10 +111,11 @@
 }
 
 @layer components {
+
   /* Glassmorphism Panel */
   .glass-panel {
     @apply bg-panel/80 backdrop-blur-xl border border-panel-border rounded-lg;
-    box-shadow: 
+    box-shadow:
       0 0 0 1px hsl(var(--panel-border) / 0.5),
       0 4px 24px -4px hsl(222 47% 0% / 0.5),
       inset 0 1px 0 0 hsl(var(--foreground) / 0.02);
@@ -122,7 +123,7 @@
 
   .glass-panel-glow {
     @apply glass-panel;
-    box-shadow: 
+    box-shadow:
       0 0 0 1px hsl(var(--panel-border) / 0.5),
       0 4px 24px -4px hsl(222 47% 0% / 0.5),
       0 0 40px -8px hsl(var(--panel-glow) / 0.15),
@@ -215,6 +216,7 @@
 }
 
 @layer utilities {
+
   /* Glow Effects */
   .glow-critical {
     box-shadow: 0 0 20px -4px hsl(var(--critical) / 0.5);
